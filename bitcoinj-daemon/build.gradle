@@ -22,13 +22,19 @@ idea {
     }
 }
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     compile project(':bitcoinj-server')
     compile "org.springframework.boot:spring-boot-starter-web"
 }
 
 springBoot {
-    mainClass = "com.msgilligan.bitcoinj.daemon.Application"
+    // figure out how to make this selectable on command line
+    //mainClass = "com.msgilligan.bitcoinj.daemon.Application"
+    mainClass = "org.namecoin.bitcoinj.daemon.Application"
     backupSource = true
 }
 

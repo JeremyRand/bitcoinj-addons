@@ -2,6 +2,8 @@ package com.msgilligan.namecoinj.json.pojo;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.core.Address;
@@ -24,7 +26,8 @@ public class NameData {
     private static ObjectMapper mapper = new ObjectMapper();
 
     private final   String name;
-    private final   Map<String, Object> value;     // Deserialized from escape JSON string
+    private final   String value;
+    private final   Map<String, Object> valueParsed;     // Deserialized from escape JSON string
     private final   Sha256Hash txid;
     private final   Address address;
     private final   int expires_in;
@@ -36,7 +39,19 @@ public class NameData {
                     @JsonProperty("address")    Address address,
                     @JsonProperty("expires_in") int expires_in) throws IOException {
         this.name = name;
-        this.value = (Map<String, Object>) mapper.readValue(value, Map.class);
+        this.value = value;
+        
+        Map<String, Object> tempValueParsed;
+        
+        try {
+            tempValueParsed = (Map<String, Object>) mapper.readValue(value, Map.class);
+        } //catch (JsonMappingException e) {
+        catch (JsonParseException e) {
+            tempValueParsed = null;
+        }
+        
+        this.valueParsed = tempValueParsed;
+        
         this.txid = txid;
         this.address = address;
         this.expires_in = expires_in;
@@ -52,10 +67,18 @@ public class NameData {
 
     /**
      *
+     * @return raw value
+     */
+    public String getValue() {
+        return value;
+    }
+    
+    /**
+     *
      * @return JSONNode
      */
-    public Map<String, Object> getValue() {
-        return value;
+    public Map<String, Object> getValueParsed() {
+        return valueParsed;
     }
 
     public Sha256Hash getTxid() {
