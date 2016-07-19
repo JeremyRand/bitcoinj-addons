@@ -99,17 +99,6 @@ public class NameLookupService implements NamecoinJsonRpc {
         
         this.filePrefix = "LibdohjNameLookupDaemon";
         
-        /*
-        // Setup kit, which is used to sync the blockchain.
-        LevelDBBlockStore store = null;
-        try {
-            store = new LevelDBBlockStore(context, new File("./" + filePrefix + ".leveldbspvchain"));
-        } catch ( BlockStoreException e ) {
-            System.out.println("Error opening block store!  Aborting!");
-            System.exit(1);
-        }
-        */
-        
         kit = new WalletAppKit(context, new File("."), filePrefix) {
             @Override
             protected BlockStore provideBlockStore(File file) throws BlockStoreException {
