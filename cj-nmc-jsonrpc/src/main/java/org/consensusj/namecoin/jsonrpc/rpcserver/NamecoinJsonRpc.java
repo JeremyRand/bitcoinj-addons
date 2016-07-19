@@ -13,5 +13,4 @@ import org.consensusj.namecoin.jsonrpc.pojo.NameData;
 public interface NamecoinJsonRpc extends BitcoinJsonRpc {
     NameData name_show(String name) throws Exception;
     NameData name_show_at_height(String name, int height) throws Exception;
-    //Sha256Hash getblockhash(int height) throws BlockStoreException; // TODO: move this to BitcoinJsonRpc
 }
