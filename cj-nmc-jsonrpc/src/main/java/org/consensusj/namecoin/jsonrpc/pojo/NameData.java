@@ -30,16 +30,21 @@ public class NameData {
     private final   String value;
     private final   Map<String, Object> valueParsed;     // Deserialized from escape JSON string
     private final   Sha256Hash txid;
+    private final   Integer vout;
     private final   Address address;
-    private final   int expires_in;
-    // TODO: add height
+    private final   Integer height;
+    private final   Integer expires_in;
+    private final   Boolean expired;
 
     @JsonCreator
     public NameData(@JsonProperty("name")       String name,
                     @JsonProperty("value")      String value,
                     @JsonProperty("txid")       Sha256Hash txid,
+                    @JsonProperty("vout")       Integer vout,
                     @JsonProperty("address")    Address address,
-                    @JsonProperty("expires_in") int expires_in) throws IOException {
+                    @JsonProperty("height")     Integer height,
+                    @JsonProperty("expires_in") Integer expires_in,
+                    @JsonProperty("expired")    Boolean expired) throws IOException {
         this.name = name;
         this.value = value;
 
@@ -54,8 +59,11 @@ public class NameData {
         this.valueParsed = tempValueParsed;
 
         this.txid = txid;
+        this.vout = vout;
         this.address = address;
+        this.height = height;
         this.expires_in = expires_in;
+        this.expired = expired;
     }
 
     /**
@@ -85,6 +93,10 @@ public class NameData {
     public Sha256Hash getTxid() {
         return txid;
     }
+    
+    public Integer getVout() {
+        return vout;
+    }
 
     /**
      *
@@ -93,8 +105,16 @@ public class NameData {
     public Address getAddress() {
         return address;
     }
+    
+    public Integer getHeight() {
+        return height;
+    }
 
-    public int getExpires_in() {
+    public Integer getExpires_in() {
         return expires_in;
+    }
+    
+    public Boolean getExpired() {
+        return expired;
     }
 }
