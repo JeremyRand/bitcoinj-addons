@@ -103,7 +103,7 @@ public class NameData {
 
     /**
      *
-     * @return Address as String (for now since bitcoinj won't allow N... addresses)
+     * @return Address
      */
     public Address getAddress() {
         return address;
