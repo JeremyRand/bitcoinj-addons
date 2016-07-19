@@ -1,8 +1,5 @@
 package org.namecoin.bitcoinj.spring.service;
 
-// TODO: remove unneeded imports
-
-import com.msgilligan.bitcoinj.json.conversion.RpcClientModule;
 import com.msgilligan.bitcoinj.json.pojo.ServerInfo;
 import org.consensusj.namecoin.jsonrpc.pojo.NameData;
 import org.consensusj.namecoin.jsonrpc.rpcserver.NamecoinJsonRpc;
@@ -16,37 +13,17 @@ import org.libdohj.names.NameLookupLatestRestMerkleApiSingleTx;
 import org.libdohj.names.NameTransactionUtils;
 import org.libdohj.script.NameScript;
 
-//import org.libdohj.core.SpecificNameLookupWallet;
-//import org.libdohj.kits.CustomWalletAppKit;
-
-import org.bitcoinj.core.Address;
-import org.bitcoinj.core.Block;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.Context;
-import org.bitcoinj.core.FilteredBlock;
-import org.bitcoinj.core.GetDataMessage;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.core.Peer;
 import org.bitcoinj.core.PeerGroup;
-import org.bitcoinj.core.ScriptException;
-import org.bitcoinj.core.Sha256Hash;
-import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.core.TransactionOutput;
-import org.bitcoinj.core.listeners.BlocksDownloadedEventListener;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.net.discovery.DnsDiscovery;
 import org.bitcoinj.net.discovery.PeerDiscovery;
-import org.bitcoinj.script.Script;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.LevelDBBlockStore;
-import org.bitcoinj.wallet.Wallet;
-import org.bitcoinj.wallet.listeners.WalletCoinsReceivedEventListener;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
@@ -54,13 +31,7 @@ import javax.inject.Named;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.lang.IllegalStateException;
 import java.math.BigDecimal;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.EnumSet;
 
 /*
 
@@ -143,6 +114,7 @@ public class NameLookupService implements NamecoinJsonRpc {
         
         namePeerGroup = new PeerGroup(netParams, kit.chain()) {
             // TODO: remove this override since it's not needed with full block mode
+            /*
             @Override
             public ListenableFuture startAsync() {
                 try {
@@ -157,6 +129,7 @@ public class NameLookupService implements NamecoinJsonRpc {
                     });
                 }
             }
+            */
         };
         
         // TODO: look into allowing non-bloom, non-headers peers since we don't use filtered blocks at the moment
