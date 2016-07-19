@@ -62,6 +62,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.EnumSet;
 
+/*
+
+TODO: fix this error that shows up in the logs:
+
+2016-07-19 10:53:06.820 ERROR 4744 --- [nio-8080-exec-1] org.bitcoinj.core.Context                : Performing thread fixup: you are accessing bitcoinj via a thread that has not had any context set on it.
+2016-07-19 10:53:06.821 ERROR 4744 --- [nio-8080-exec-1] org.bitcoinj.core.Context                : This error has been corrected for, but doing this makes your app less robust.
+2016-07-19 10:53:06.821 ERROR 4744 --- [nio-8080-exec-1] org.bitcoinj.core.Context                : You should use Context.propagate() or a ContextPropagatingThreadFactory.
+2016-07-19 10:53:06.821 ERROR 4744 --- [nio-8080-exec-1] org.bitcoinj.core.Context                : Please refer to the user guide for more information about this.
+2016-07-19 10:53:06.821 ERROR 4744 --- [nio-8080-exec-1] org.bitcoinj.core.Context                : Thread name is http-nio-8080-exec-1.
+
+It doesn't seem to be causing obvious issues, but still should be fixed.
+
+*/
 
 /**
  * Implement a subset of Bitcoin JSON RPC using only a PeerGroup
@@ -179,29 +192,6 @@ public class NameLookupService implements NamecoinJsonRpc {
     public Integer getblockcount() {
         return kit.chain().getChainHead().getHeight();
     }
-
-    /*
-    @Override
-    public Sha256Hash getblockhash(int height) throws BlockStoreException {
-        Sha256Hash maybeResult = blockHashCache.get(new Integer(height));
-        
-        if (maybeResult != null) {
-            return maybeResult;
-        }
-        
-        // If we got this far, the block height is uncached.
-        // This could be because the block is immature, 
-        // or it could be because the cache is only initialized on initial startup.
-        
-        StoredBlock blockPointer = kit.chain().getChainHead();
-        
-        while (blockPointer.getHeight() != height) {
-            blockPointer = blockPointer.getPrev(kit.store());
-        }
-        
-        return blockPointer.getHeader().getHash();
-    }
-    */
     
     @Override
     public Integer getconnectioncount() {
@@ -241,13 +231,14 @@ public class NameLookupService implements NamecoinJsonRpc {
         NameScript ns = NameTransactionUtils.getNameAnyUpdateScript(tx, name);
     
         // TODO: fill in more of the fields
+        // TODO: move the expiration period to libdohj's NetworkParameters
         return new NameData(
             name, 
             new String(ns.getOpValue().data, "ISO-8859-1"), 
             tx.getHash(), 
             null,
             ns.getAddress().getToAddress(netParams), 
-            null,
+            tx.getConfidence().getAppearedAtChainHeight(),
             36000 - tx.getConfidence().getDepthInBlocks() + 1, // tested for correctness against webbtc API
             null
         );
