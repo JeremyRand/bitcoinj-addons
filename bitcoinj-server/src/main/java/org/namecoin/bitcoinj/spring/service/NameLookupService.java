@@ -4,12 +4,8 @@ import com.msgilligan.bitcoinj.json.pojo.ServerInfo;
 import com.msgilligan.namecoinj.json.pojo.NameData;
 import org.namecoin.bitcoinj.rpcserver.NamecoinJsonRpc;
 
-import org.libdohj.names.NameLookupByBlockHashOneFullBlock;
-import org.libdohj.names.NameLookupByBlockHeightHashCache;
+import org.libdohj.names.NameLookupByBlockHeight;
 import org.libdohj.names.NameLookupLatest;
-import org.libdohj.names.NameLookupLatestRestHeightApi;
-import org.libdohj.names.NameLookupLatestRestMerkleApi;
-import org.libdohj.names.NameLookupLatestRestMerkleApiSingleTx;
 import org.libdohj.names.NameTransactionUtils;
 import org.libdohj.script.NameScript;
 
@@ -68,93 +64,29 @@ public class NameLookupService implements NamecoinJsonRpc {
     // TODO: use per-identity PeerGroups 
     protected PeerGroup namePeerGroup;
     
-    protected NameLookupByBlockHashOneFullBlock lookupByHash;
-    protected NameLookupByBlockHeightHashCache lookupByHeight;
+    //protected NameLookupByBlockHashOneFullBlock lookupByHash;
+    protected NameLookupByBlockHeight lookupByHeight;
     protected NameLookupLatest lookupLatest;
     
     private int timeOffset = 0;
     private BigDecimal difficulty = new BigDecimal(0);
 
     @Inject
-    public NameLookupService(NetworkParameters params /*,
+    public NameLookupService(NetworkParameters params, Context context, WalletAppKit kit, NameLookupByBlockHeight lookupByHeight, NameLookupLatest lookupLatest /*,
                        PeerDiscovery peerDiscovery */) {
         this.netParams = params;
-        this.context = new Context(params);
+        this.context = context;
         
         this.filePrefix = "LibdohjNameLookupDaemon";
         
-        kit = new WalletAppKit(context, new File("."), filePrefix) {
-            @Override
-            protected BlockStore provideBlockStore(File file) throws BlockStoreException {
-                return new LevelDBBlockStore(context, file);
-            }
-            
-            @Override
-            protected void onSetupCompleted() {
-                vPeerGroup.setMinRequiredProtocolVersion(params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.MINIMUM));
-            }
-        };
+        this.kit = kit;
         
-        // TODO: call kit.setCheckpoints so that we sync faster.
-        // See the following links:
-        // https://groups.google.com/forum/?_escaped_fragment_=topic/bitcoinj/CycE9YTS7Bs#!topic/bitcoinj/CycE9YTS7Bs
-        // https://github.com/bitcoinj/bitcoinj/blob/master/tools/src/main/resources/org/bitcoinj/tools/build-checkpoints-help.txt
-        // https://github.com/namecoin/namecoin-core/blob/master/src/chainparams.cpp#L164
-        
-        // When uncommented, this allows the RPC server to use an incomplete blockchain.  This is usually insecure for name lookups.
-        // TODO: uncomment this and use a different method to detect incomplete blockchains that doesn't block the RPC server from replying with error messages.
-        //kit.setBlockingStartup(false);
+        this.lookupByHeight = lookupByHeight;
+        this.lookupLatest = lookupLatest;
     }
 
     @PostConstruct
     public void start() {
-        // Start downloading the block chain and wait until it's done.
-        kit.startAsync();
-        kit.awaitRunning();
-        
-        namePeerGroup = new PeerGroup(netParams, kit.chain()) {
-            // TODO: remove this override since it's not needed with full block mode
-            /*
-            @Override
-            public ListenableFuture startAsync() {
-                try {
-                    return super.startAsync();
-                }
-                catch (IllegalStateException e) {
-                    return executor.submit(new Runnable() {
-                        @Override
-                        public void run() {
-                            System.out.println("Skipping PeerGroup start because we already started.");
-                        }
-                    });
-                }
-            }
-            */
-        };
-        
-        // TODO: look into allowing non-bloom, non-headers peers since we don't use filtered blocks at the moment
-        namePeerGroup.setMinRequiredProtocolVersion(netParams.getProtocolVersionNum(NetworkParameters.ProtocolVersion.BLOOM_FILTER));
-        namePeerGroup.addPeerDiscovery(new DnsDiscovery(netParams));
-        namePeerGroup.startAsync();
-        
-        try {
-            lookupByHash = new NameLookupByBlockHashOneFullBlock(namePeerGroup);
-            lookupByHeight = new NameLookupByBlockHeightHashCache(kit.chain(), lookupByHash);
-            
-            // Height History API + P2P block
-            //lookupLatest = new NameLookupLatestRestHeightApi("https://namecoin.webbtc.com/name/heights/", ".json?raw", kit.chain(), lookupByHeight);
-            
-            // Merkle Branch History API
-            //lookupLatest = new NameLookupLatestRestMerkleApi(netParams, "https://namecoin.webbtc.com/name/", ".json?history&with_height&with_rawtx&with_mrkl_branch&with_tx_idx&raw", kit.chain(), kit.store(), lookupByHeight);
-            
-            // Merkle Branch Single-Transaction API (broken because the API doesn't return an array as expected)
-            lookupLatest = new NameLookupLatestRestMerkleApiSingleTx(netParams, "https://namecoin.webbtc.com/name/", ".json?with_height&with_rawtx&with_mrkl_branch&with_tx_idx&raw", kit.chain(), kit.store(), lookupByHeight);
-        } catch (Exception e) {
-            System.out.println("Error initializing name lookups!");
-            System.out.println(e.toString());
-            System.out.println("Aborting!");
-            System.exit(1);
-        }
     }
 
     public NetworkParameters getNetworkParameters() {
