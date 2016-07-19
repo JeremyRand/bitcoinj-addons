@@ -240,12 +240,16 @@ public class NameLookupService implements NamecoinJsonRpc {
         
         NameScript ns = NameTransactionUtils.getNameAnyUpdateScript(tx, name);
     
+        // TODO: fill in more of the fields
         return new NameData(
             name, 
             new String(ns.getOpValue().data, "ISO-8859-1"), 
             tx.getHash(), 
+            null,
             ns.getAddress().getToAddress(netParams), 
-            36000 - tx.getConfidence().getDepthInBlocks() + 1 // tested for correctness against webbtc API
+            null,
+            36000 - tx.getConfidence().getDepthInBlocks() + 1, // tested for correctness against webbtc API
+            null
         );
         
     }
