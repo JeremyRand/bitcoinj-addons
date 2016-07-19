@@ -1,5 +1,7 @@
 package org.namecoin.bitcoinj.spring.service;
 
+// TODO: remove unneeded imports
+
 import com.msgilligan.bitcoinj.json.conversion.RpcClientModule;
 import com.msgilligan.bitcoinj.json.pojo.ServerInfo;
 import org.consensusj.namecoin.jsonrpc.pojo.NameData;
@@ -117,6 +119,12 @@ public class NameLookupService implements NamecoinJsonRpc {
             }
         };
         
+        // TODO: call kit.setCheckpoints so that we sync faster.
+        // See the following links:
+        // https://groups.google.com/forum/?_escaped_fragment_=topic/bitcoinj/CycE9YTS7Bs#!topic/bitcoinj/CycE9YTS7Bs
+        // https://github.com/bitcoinj/bitcoinj/blob/master/tools/src/main/resources/org/bitcoinj/tools/build-checkpoints-help.txt
+        // https://github.com/namecoin/namecoin-core/blob/master/src/chainparams.cpp#L164
+        
         // When uncommented, this allows the RPC server to use an incomplete blockchain.  This is usually insecure for name lookups.
         // TODO: uncomment this and use a different method to detect incomplete blockchains that doesn't block the RPC server from replying with error messages.
         //kit.setBlockingStartup(false);
@@ -129,6 +137,7 @@ public class NameLookupService implements NamecoinJsonRpc {
         kit.awaitRunning();
         
         namePeerGroup = new PeerGroup(netParams, kit.chain()) {
+            // TODO: remove this override since it's not needed with full block mode
             @Override
             public ListenableFuture startAsync() {
                 try {
@@ -144,6 +153,8 @@ public class NameLookupService implements NamecoinJsonRpc {
                 }
             }
         };
+        
+        // TODO: look into allowing non-bloom, non-headers peers since we don't use filtered blocks at the moment
         namePeerGroup.setMinRequiredProtocolVersion(netParams.getProtocolVersionNum(NetworkParameters.ProtocolVersion.BLOOM_FILTER));
         namePeerGroup.addPeerDiscovery(new DnsDiscovery(netParams));
         namePeerGroup.startAsync();
