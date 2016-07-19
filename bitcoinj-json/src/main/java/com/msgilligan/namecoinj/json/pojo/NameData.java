@@ -31,6 +31,7 @@ public class NameData {
     private final   Sha256Hash txid;
     private final   Address address;
     private final   int expires_in;
+    // TODO: add height
 
     @JsonCreator
     public NameData(@JsonProperty("name")       String name,
