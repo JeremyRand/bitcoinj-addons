@@ -23,6 +23,7 @@ idea {
 dependencies {
     compile project(':bitcoinj-server')
     compile "org.springframework.boot:spring-boot-starter-web"
+    compile "org.fusesource.leveldbjni:leveldbjni-all:1.8"
 }
 
 
