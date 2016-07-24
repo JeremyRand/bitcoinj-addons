@@ -10,8 +10,11 @@ import org.libdohj.names.NameLookupLatestRestHeightApi;
 import org.libdohj.names.NameLookupLatestRestMerkleApi;
 import org.libdohj.names.NameLookupLatestRestMerkleApiSingleTx;
 
+import org.bitcoinj.core.Block;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.core.PeerGroup;
+import org.bitcoinj.core.StoredBlock;
+import org.bitcoinj.core.VerificationException;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.store.BlockStore;
 import org.bitcoinj.store.BlockStoreException;
@@ -35,6 +38,8 @@ import com.fasterxml.jackson.databind.Module;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Date;
+import java.util.EnumSet;
 
 /**
  * Spring configuration for bitcoinj, Bitcoin services, and JSON-RPC server
@@ -44,10 +49,48 @@ public class NamecoinConfig /* implements DisposableBean */ {
 
     @Autowired
     private Environment env;
+    
+    private NetworkParameters params;
 
     @Bean
     public NetworkParameters networkParameters() {
-        return NamecoinMainNetParams.get();
+        if (params == null) {
+            String latestAlgo = env.getProperty("namelookup.latest.algo", "restmerkleapi");
+            Boolean enabledGetFullBlocks = env.getProperty("namelookup.latest.getfullblocks", Boolean.class, true);
+            
+            // WARNING: Stupid API hack here.
+            // Unfortunately there's no good API in BitcoinJ to selectively check internal validity of incoming full-blocks.
+            // Either you're in SPV mode (never check internal validity or signatures), or you're in full-node mode (always demans internal validity as well as signatures).
+            // We want to only check internal validity for unexpired blocks (to avoid censorship attacks by non-miners).
+            // We don't care about signature validity at all (miner attacks aren't in our threat model).
+            // Normally the behavior we want to change would be in AbstractBlockChain.add(), but it's private.
+            // Conveniently, received full blocks happen to be passed to checkDifficultyTransition prior to being accepted, and that method is public.
+            // So we override it to add a conditional internal validity check based on block timestamp.
+            params = new NamecoinMainNetParams() {
+                @Override
+                public void checkDifficultyTransitions(StoredBlock storedPrev, Block nextBlock, BlockStore blockStore)
+                    throws VerificationException, BlockStoreException {
+                    
+                    super.checkDifficultyTransitions(storedPrev, nextBlock, blockStore);
+                    
+                    switch (latestAlgo) {
+                        case "leveldbtxcache":
+                            if (enabledGetFullBlocks) {
+                                // If the block is newer than 1 year old
+                                // TODO: use BIP 113 timestamps
+                                if ( ! ( (new Date().getTime() / 1000 ) - nextBlock.getTimeSeconds() > 366 * 24 * 60 * 60 ) ) {
+                                    System.err.println("Verifying internal validity of candidate full block " + (storedPrev.getHeight() + 1) );
+                                    final EnumSet<Block.VerifyFlag> flags = EnumSet.noneOf(Block.VerifyFlag.class);
+                                    nextBlock.verify(-1, flags);
+                                    System.err.println("Internal validity check passed for candidate full block " + (storedPrev.getHeight() + 1) );
+                                }
+                            }
+                            break;
+                    }
+                }
+            };
+        }
+        return params;
     }
     
     private Context context;
@@ -109,6 +152,10 @@ public class NamecoinConfig /* implements DisposableBean */ {
                                 namePeerGroup.startAsync();
                                 
                                 lookupLatest = new NameLookupLatestLevelDBTransactionCache(context, new File(directory, filePrefix + ".namedb"), kit.chain(), kit.store(), namePeerGroup);
+                                
+                                // TODO: optionally enable bloom filtering
+                                peerGroup().setBloomFilteringEnabled(false);
+                                peerGroup().setFastCatchupTimeSecs( (new Date().getTime() / 1000 ) - (366 * 24 * 60 * 60) );
                             }
                             catch (Exception e) {
                                 System.err.println("Exception creating Name Database: " + e);
