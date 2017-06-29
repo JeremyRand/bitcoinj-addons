@@ -36,6 +36,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Date;
@@ -52,6 +55,8 @@ public class NamecoinConfig /* implements DisposableBean */ {
 
     private NetworkParameters params;
 
+    protected Logger log = LoggerFactory.getLogger(NamecoinConfig.class);
+    
     @Bean
     public NetworkParameters networkParameters() {
         // TODO: We may also want to make this set from a configuration string
@@ -63,7 +68,7 @@ public class NamecoinConfig /* implements DisposableBean */ {
 
             // WARNING: Stupid API hack here.
             // Unfortunately there's no good API in BitcoinJ to selectively check internal validity of incoming full-blocks.
-            // Either you're in SPV mode (never check internal validity or signatures), or you're in full-node mode (always demans internal validity as well as signatures).
+            // Either you're in SPV mode (never check internal validity or signatures), or you're in full-node mode (always demand internal validity as well as signatures).
             // We want to only check internal validity for unexpired blocks (to avoid censorship attacks by non-miners).
             // We don't care about signature validity at all (miner attacks aren't in our threat model).
             // Normally the behavior we want to change would be in AbstractBlockChain.add(), but it's private.
@@ -82,10 +87,10 @@ public class NamecoinConfig /* implements DisposableBean */ {
                                 // If the block is newer than 1 year old
                                 // TODO: use BIP 113 timestamps
                                 if ( ! ( (new Date().getTime() / 1000 ) - nextBlock.getTimeSeconds() > 366 * 24 * 60 * 60 ) ) {
-                                    System.err.println("Verifying internal validity of candidate full block " + (storedPrev.getHeight() + 1) );
+                                    log.debug("Verifying internal validity of candidate full block " + (storedPrev.getHeight() + 1) );
                                     final EnumSet<Block.VerifyFlag> flags = EnumSet.noneOf(Block.VerifyFlag.class);
                                     nextBlock.verify(-1, flags);
-                                    System.err.println("Internal validity check passed for candidate full block " + (storedPrev.getHeight() + 1) );
+                                    log.debug("Internal validity check passed for candidate full block " + (storedPrev.getHeight() + 1) );
                                 }
                             }
                             break;
@@ -161,7 +166,7 @@ public class NamecoinConfig /* implements DisposableBean */ {
                                 peerGroup().setFastCatchupTimeSecs( (new Date().getTime() / 1000 ) - (366 * 24 * 60 * 60) );
                             }
                             catch (Exception e) {
-                                System.err.println("Exception creating Name Database: " + e);
+                                log.error("Exception creating Name Database", e);
                                 System.exit(-1);
                             }
                             break;
@@ -175,12 +180,12 @@ public class NamecoinConfig /* implements DisposableBean */ {
                     }
 
                     if (lookupLatest instanceof NameLookupLatestLevelDBTransactionCache) {
-                        System.err.println("***Closing Name Database***");
+                        log.info("Closing Name Database");
                         try {
                             ((NameLookupLatestLevelDBTransactionCache)lookupLatest).close();
                         }
                         catch (Exception e) {
-                            System.err.println("Exception occurred closing Name Database: " + e);
+                            log.error("Exception occurred closing Name Database", e);
                         }
                     }
 
@@ -343,12 +348,12 @@ public class NamecoinConfig /* implements DisposableBean */ {
     @Override
     public void destroy() {
         if (lookupLatest instanceof NameLookupLatestLevelDBTransactionCache) {
-            System.err.println("***Closing Name Database***");
+            log.info("Closing Name Database");
             try {
                 ((NameLookupLatestLevelDBTransactionCache)lookupLatest).close();
             }
             catch (Exception e) {
-                System.err.println("Exception occurred closing Name Database: " + e);
+                log.error("Exception occurred closing Name Database", e);
             }
         }
     }
