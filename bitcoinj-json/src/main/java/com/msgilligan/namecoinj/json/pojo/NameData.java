@@ -54,7 +54,7 @@ public class NameData {
         
         try {
             tempValueParsed = mapper.readValue(value, mapType);
-        } //catch (JsonMappingException e) {
+        }
         catch (JsonParseException e) {
             tempValueParsed = null;
         }
