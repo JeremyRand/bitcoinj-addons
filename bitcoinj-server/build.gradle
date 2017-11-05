@@ -1,5 +1,11 @@
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     compile project(':bitcoinj-json')
+    compile "org.libdohj:libdohj:0.14-SNAPSHOT"
+    compile "org.fusesource.leveldbjni:leveldbjni-all:1.8"
     compile "javax.inject:javax.inject:1"
     compile "org.springframework.boot:spring-boot-starter-websocket:1.4.0.RELEASE"
     compile "com.github.briandilley.jsonrpc4j:jsonrpc4j:1.1"
