@@ -7,6 +7,7 @@ import org.libdohj.names.NameLookupByBlockHashOneFullBlock;
 import org.libdohj.names.NameLookupByBlockHeight;
 import org.libdohj.names.NameLookupByBlockHeightHashCache;
 import org.libdohj.names.NameLookupLatest;
+import org.libdohj.names.NameLookupLatestLevelDBTransactionCache;
 import org.libdohj.names.NameLookupLatestRestHeightApi;
 import org.libdohj.names.NameLookupLatestRestMerkleApi;
 import org.libdohj.names.NameLookupLatestRestMerkleApiSingleTx;
@@ -28,6 +29,7 @@ import org.bitcoinj.kits.WalletAppKit;
 import org.consensusj.namecoin.jsonrpc.rpcserver.NamecoinJsonRpc;
 import org.libdohj.params.NamecoinMainNetParams;
 import org.namecoin.bitcoinj.spring.service.NameLookupService;
+//import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,7 +42,7 @@ import java.io.FileNotFoundException;
  * Spring configuration for namecoinj, Namecoin services, and JSON-RPC server
  */
 @Configuration
-public class NamecoinConfig {
+public class NamecoinConfig /* implements DisposableBean */ {
 
     @Autowired
     private Environment env;
@@ -75,6 +77,8 @@ public class NamecoinConfig {
 
     private WalletAppKit kit;
 
+    PeerGroup namePeerGroup;
+
     @Bean
     public WalletAppKit getKit(Context context) throws Exception {
         if (kit == null) {
@@ -82,10 +86,13 @@ public class NamecoinConfig {
             dieIfProxyEnabled();
             dieIfStreamIsolationEnabled();
 
+            String latestAlgo = env.getProperty("namelookup.latest.algo", "restmerkleapi");
+
             // TODO: make File(".") and filePrefix configurable
+            File directory = new File(".");
             String filePrefix = "LibdohjNameLookupDaemon";
 
-            kit = new WalletAppKit(context, new File("."), filePrefix) {
+            kit = new WalletAppKit(context, directory, filePrefix) {
                 @Override
                 protected BlockStore provideBlockStore(File file) throws BlockStoreException {
                     return new LevelDBBlockStore(context, file);
@@ -94,6 +101,45 @@ public class NamecoinConfig {
                 @Override
                 protected void onSetupCompleted() {
                     vPeerGroup.setMinRequiredProtocolVersion(params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.MINIMUM));
+
+                    // Some of the algos require being setup inside this hook, so we do it here instead of after getKit() finishes.
+                    switch (latestAlgo) {
+                        case "leveldbtxcache":
+                            try {
+                                namePeerGroup = new PeerGroup(context.getParams(), kit.chain());
+
+                                // TODO: look into allowing non-bloom, non-headers peers since we don't use filtered blocks at the moment
+                                namePeerGroup.setMinRequiredProtocolVersion(context.getParams().getProtocolVersionNum(NetworkParameters.ProtocolVersion.BLOOM_FILTER));
+                                namePeerGroup.addPeerDiscovery(new DnsDiscovery(context.getParams()));
+                                namePeerGroup.startAsync();
+
+                                lookupLatest = new NameLookupLatestLevelDBTransactionCache(context, new File(directory, filePrefix + ".namedb"), kit.chain(), kit.store(), namePeerGroup);
+                            }
+                            catch (Exception e) {
+                                System.err.println("Exception creating Name Database: " + e);
+                                System.exit(-1);
+                            }
+                            break;
+                    }
+                }
+
+                @Override
+                protected void shutDown() throws Exception {
+                    if (namePeerGroup != null) {
+                        namePeerGroup.stop();
+                    }
+
+                    if (lookupLatest instanceof NameLookupLatestLevelDBTransactionCache) {
+                        System.err.println("***Closing Name Database***");
+                        try {
+                            ((NameLookupLatestLevelDBTransactionCache)lookupLatest).close();
+                        }
+                        catch (Exception e) {
+                            System.err.println("Exception occurred closing Name Database: " + e);
+                        }
+                    }
+
+                    super.shutDown();
                 }
             };
 
@@ -150,7 +196,7 @@ public class NamecoinConfig {
                     dieIfProxyEnabled();
                     dieIfStreamIsolationEnabled();
 
-                    PeerGroup namePeerGroup = new PeerGroup(netParams, kit.chain());
+                    namePeerGroup = new PeerGroup(netParams, kit.chain());
 
                     // TODO: look into allowing non-bloom, non-headers peers since we don't use filtered blocks at the moment
                     namePeerGroup.setMinRequiredProtocolVersion(netParams.getProtocolVersionNum(NetworkParameters.ProtocolVersion.BLOOM_FILTER));
@@ -266,4 +312,19 @@ public class NamecoinConfig {
         exporter.setBackwardsComaptible(true);
         return exporter;
     }
+
+    /*
+    @Override
+    public void destroy() {
+        if (lookupLatest instanceof NameLookupLatestLevelDBTransactionCache) {
+            System.err.println("***Closing Name Database***");
+            try {
+                ((NameLookupLatestLevelDBTransactionCache)lookupLatest).close();
+            }
+            catch (Exception e) {
+                System.err.println("Exception occurred closing Name Database: " + e);
+            }
+        }
+    }
+    */
 }
