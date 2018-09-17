@@ -8,7 +8,8 @@ repositories {
 dependencies {
     compile project(':bitcoinj-json')
     compile project(':cj-nmc-jsonrpc')
-    compile "org.libdohj:libdohj:0.14-SNAPSHOT"
+    compile "org.libdohj:libdohj-core:0.14-SNAPSHOT"
+    compile "org.libdohj:libdohj-namecoin:0.14-SNAPSHOT"
     compile "org.fusesource.leveldbjni:leveldbjni-all:1.8"
     compile "javax.inject:javax.inject:1"
     compile "org.springframework.boot:spring-boot-starter-websocket:${springBootVersion}"
