@@ -74,10 +74,11 @@ public class NamecoinConfig {
     private WalletAppKit kit;
 
     @Bean
-    public WalletAppKit getKit(Context context) {
+    public WalletAppKit getKit(Context context) throws Exception {
         if (kit == null) {
 
-            // TODO: check privacy settings here
+            dieIfProxyEnabled();
+            dieIfStreamIsolationEnabled();
 
             // TODO: make File(".") and filePrefix configurable
             String filePrefix = "LibdohjNameLookupDaemon";
@@ -122,6 +123,18 @@ public class NamecoinConfig {
         return val;
     }
 
+    private void dieIfStreamIsolationEnabled() throws Exception {
+        if (getStreamIsolationEnabled()) {
+            throw new Exception("Stream isolation is not supported.  If you are okay with reducing your privacy, disable stream isolation.");
+        }
+    }
+
+    private void dieIfProxyEnabled() throws Exception {
+        if (getProxyEnabled()) {
+            throw new Exception("Proxying is not supported.  If you are okay with reducing your privacy, disable proxying.");
+        }
+    }
+
     private NameLookupByBlockHash lookupByHash;
 
     @Bean
@@ -132,12 +145,8 @@ public class NamecoinConfig {
 
             switch (algo) {
                 case "p2pfullblock":
-                    if (getStreamIsolationEnabled()) {
-                        throw new Exception("Stream isolation is not supported.  If you are okay with reducing your privacy, disable stream isolation.");
-                    }
-                    if (getProxyEnabled()) {
-                        throw new Exception("Proxying is not supported.  If you are okay with reducing your privacy, disable proxying.");
-                    }
+                    dieIfProxyEnabled();
+                    dieIfStreamIsolationEnabled();
 
                     PeerGroup namePeerGroup = new PeerGroup(netParams, kit.chain());
 
@@ -159,11 +168,18 @@ public class NamecoinConfig {
 
     private NameLookupByBlockHeight lookupByHeight;
 
-    // TODO: finish this logic
     @Bean
     public NameLookupByBlockHeight getLookupByHeight(WalletAppKit kit, NameLookupByBlockHash lookupByHash) throws Exception {
         if (lookupByHeight == null) {
-            lookupByHeight = new NameLookupByBlockHeightHashCache(kit.chain(), lookupByHash);
+            String algo = env.getProperty("namelookup.byheight.algo", "p2phashcache");
+
+            switch (algo) {
+                case "p2phashcache":
+                    lookupByHeight = new NameLookupByBlockHeightHashCache(kit.chain(), lookupByHash);
+                    break;
+                default:
+                    throw new Exception("Invalid algorithm for lookup by block height.");
+            }
         }
 
         return lookupByHeight;
@@ -171,11 +187,41 @@ public class NamecoinConfig {
 
     private NameLookupLatest lookupLatest;
 
-    // TODO: finish this logic
     @Bean
-    public NameLookupLatest getLookupLatest(WalletAppKit kit, NameLookupByBlockHeight lookupByHeight) throws Exception {
+    public NameLookupLatest getLookupLatest(NetworkParameters netParams, WalletAppKit kit, NameLookupByBlockHeight lookupByHeight) throws Exception {
         if (lookupLatest == null) {
-            lookupLatest = new NameLookupLatestRestMerkleApiSingleTx(networkParameters(), "https://namecoin.webbtc.com/name/", ".json?with_height&with_rawtx&with_mrkl_branch&with_tx_idx&raw", kit.chain(), kit.store(), (NameLookupByBlockHeightHashCache)lookupByHeight);
+            String algo = env.getProperty("namelookup.latest.algo", "restmerkleapi");
+
+            String restUrlPrefix, restUrlSuffix;
+
+            switch (algo) {
+                case "restheightapi":
+                    dieIfProxyEnabled();
+                    dieIfStreamIsolationEnabled();
+
+                    restUrlPrefix = env.getProperty("namelookup.latest.resturlprefix", "https://namecoin.webbtc.com/name/heights/");
+                    restUrlSuffix = env.getProperty("namelookup.latest.resturlsuffix", ".json?raw");
+                    lookupLatest = new NameLookupLatestRestHeightApi(restUrlPrefix, restUrlSuffix, kit.chain(), lookupByHeight);
+                    break;
+                case "restmerkleapi":
+                    dieIfProxyEnabled();
+                    dieIfStreamIsolationEnabled();
+
+                    restUrlPrefix = env.getProperty("namelookup.latest.resturlprefix", "https://namecoin.webbtc.com/name/");
+                    restUrlSuffix = env.getProperty("namelookup.latest.resturlsuffix", ".json?history&with_height&with_rawtx&with_mrkl_branch&with_tx_idx&raw");
+                    lookupLatest = new NameLookupLatestRestMerkleApi(netParams, restUrlPrefix, restUrlSuffix, kit.chain(), kit.store(), (NameLookupByBlockHeightHashCache)lookupByHeight);
+                    break;
+                case "restmerkleapisingle":
+                    dieIfProxyEnabled();
+                    dieIfStreamIsolationEnabled();
+
+                    restUrlPrefix = env.getProperty("namelookup.latest.resturlprefix", "https://namecoin.webbtc.com/name/");
+                    restUrlSuffix = env.getProperty("namelookup.latest.resturlsuffix", ".json?with_height&with_rawtx&with_mrkl_branch&with_tx_idx&raw");
+                    lookupLatest = new NameLookupLatestRestMerkleApiSingleTx(netParams, restUrlPrefix, restUrlSuffix, kit.chain(), kit.store(), (NameLookupByBlockHeightHashCache)lookupByHeight);
+                    break;
+                default:
+                    throw new Exception("Invalid algorithm for latest lookup.");
+            }
         }
 
         return lookupLatest;
