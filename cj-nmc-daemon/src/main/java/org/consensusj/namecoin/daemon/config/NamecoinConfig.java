@@ -3,15 +3,14 @@ package org.consensusj.namecoin.daemon.config;
 import com.fasterxml.jackson.databind.Module;
 import com.googlecode.jsonrpc4j.spring.JsonServiceExporter;
 import com.msgilligan.bitcoinj.json.conversion.RpcServerModule;
-import com.msgilligan.bitcoinj.rpcserver.BitcoinJsonRpc;
-import com.msgilligan.bitcoinj.spring.service.PeerGroupService;
-import com.msgilligan.bitcoinj.spring.service.WalletAppKitService;
 import org.bitcoinj.core.Context;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.net.discovery.DnsDiscovery;
 import org.bitcoinj.net.discovery.PeerDiscovery;
 import org.bitcoinj.kits.WalletAppKit;
+import org.consensusj.namecoin.jsonrpc.rpcserver.NamecoinJsonRpc;
 import org.libdohj.params.NamecoinMainNetParams;
+import org.namecoin.bitcoinj.spring.service.NameLookupService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -31,6 +30,7 @@ public class NamecoinConfig {
         return NamecoinMainNetParams.get();
     }
 
+    /*
     @Bean
     public PeerDiscovery peerDiscovery(NetworkParameters params) throws FileNotFoundException {
         PeerDiscovery pd;
@@ -38,6 +38,7 @@ public class NamecoinConfig {
 //        pd = new SeedPeers(params);
         return pd;
     }
+    */
 
     @Bean
     public Context getContext(NetworkParameters params) {
@@ -59,8 +60,9 @@ public class NamecoinConfig {
     }
 
     @Bean
-    public PeerGroupService peerGroupService(NetworkParameters params, PeerDiscovery peerDiscovery) {
-        return new PeerGroupService(params, peerDiscovery);
+    public NameLookupService nameLookupService(NetworkParameters params/*, PeerDiscovery peerDiscovery*/) {
+        //return new PeerGroupService(params, peerDiscovery);
+        return new NameLookupService(params);
     }
 
     @Bean
@@ -69,10 +71,10 @@ public class NamecoinConfig {
     }
 
     @Bean(name="/")
-    public JsonServiceExporter bitcoinServiceExporter(WalletAppKitService walletAppKitService) {
+    public JsonServiceExporter namecoinServiceExporter(NameLookupService nameLookupService) {
         JsonServiceExporter exporter = new JsonServiceExporter();
-        exporter.setService(walletAppKitService);
-        exporter.setServiceInterface(BitcoinJsonRpc.class);
+        exporter.setService(nameLookupService);
+        exporter.setServiceInterface(NamecoinJsonRpc.class);
         exporter.setBackwardsComaptible(true);
         return exporter;
     }

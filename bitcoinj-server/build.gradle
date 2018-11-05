@@ -5,8 +5,15 @@ plugins {
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
 
+repositories {
+    mavenLocal()
+}
+
 dependencies {
     api project(':bitcoinj-json')
+    api project(':cj-nmc-jsonrpc')
+    api "org.libdohj:libdohj:0.14-SNAPSHOT"
+    api "org.fusesource.leveldbjni:leveldbjni-all:1.8"
     api "javax.inject:javax.inject:1"
     api "org.springframework.boot:spring-boot-starter-websocket:${springBootVersion}"
 }
