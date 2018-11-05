@@ -20,6 +20,11 @@ idea {
     }
 }
 
+repositories {
+    mavenLocal()
+    maven { url 'https://jitpack.io' }
+}
+
 dependencies {
     compile project(':bitcoinj-server')
 
