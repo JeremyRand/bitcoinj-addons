@@ -25,6 +25,7 @@ dependencies {
 
     compile "org.springframework.boot:spring-boot-starter-web"
     compile "com.github.briandilley.jsonrpc4j:jsonrpc4j:${jsonrpc4jVersion}"
+    compile "org.fusesource.leveldbjni:leveldbjni-all:1.8"
 }
 
 
