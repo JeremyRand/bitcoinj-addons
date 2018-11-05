@@ -7,12 +7,13 @@ targetCompatibility = 1.7
 
 repositories {
     mavenLocal()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
     api project(':bitcoinj-json')
     api project(':cj-nmc-jsonrpc')
-    api "org.libdohj:libdohj-core:0.14-SNAPSHOT"
+    api "com.github.dogecoin:libdohj:31fb8985ba13fbf20f102679df75fc7daf5098d4"
     api "org.libdohj:libdohj-namecoin:0.14-SNAPSHOT"
     api "org.fusesource.leveldbjni:leveldbjni-all:1.8"
     api "javax.inject:javax.inject:1"
