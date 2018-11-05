@@ -2,6 +2,7 @@ package org.consensusj.namecoin.jsonrpc.pojo;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.core.Address;
@@ -26,7 +27,8 @@ public class NameData {
 
 
     private final   String name;
-    private final   Map<String, Object> value;     // Deserialized from escape JSON string
+    private final   String value;
+    private final   Map<String, Object> valueParsed;     // Deserialized from escape JSON string
     private final   Sha256Hash txid;
     private final   Address address;
     private final   int expires_in;
@@ -38,7 +40,18 @@ public class NameData {
                     @JsonProperty("address")    Address address,
                     @JsonProperty("expires_in") int expires_in) throws IOException {
         this.name = name;
-        this.value = mapper.readValue(value, mapType);
+        this.value = value;
+
+        Map<String, Object> tempValueParsed;
+
+        try {
+            tempValueParsed = mapper.readValue(value, mapType);
+        } catch (JsonParseException e) {
+            tempValueParsed = null;
+        }
+
+        this.valueParsed = tempValueParsed;
+
         this.txid = txid;
         this.address = address;
         this.expires_in = expires_in;
@@ -54,10 +67,18 @@ public class NameData {
 
     /**
      *
+     * @return raw value
+     */
+    public String getValue() {
+        return value;
+    }
+
+    /**
+     *
      * @return JSONNode
      */
-    public Map<String, Object> getValue() {
-        return value;
+    public Map<String, Object> getValueParsed() {
+        return valueParsed;
     }
 
     public Sha256Hash getTxid() {
