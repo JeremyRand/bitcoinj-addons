@@ -103,16 +103,6 @@ public class NamecoinConfig /* implements DisposableBean */ {
         return params;
     }
 
-    private Context context;
-
-    @Bean
-    public Context getContext(NetworkParameters params) {
-        if (context == null) {
-            context = new Context(params);
-        }
-        return context;
-    }
-
     /*
     @Bean
     public PeerDiscovery peerDiscovery(NetworkParameters params) throws FileNotFoundException {
@@ -123,92 +113,87 @@ public class NamecoinConfig /* implements DisposableBean */ {
     }
     */
 
-    private WalletAppKit kit;
-
     PeerGroup namePeerGroup;
 
     @Bean
     public WalletAppKit getKit(Context context) throws Exception {
-        if (kit == null) {
+        dieIfProxyEnabled();
+        dieIfStreamIsolationEnabled();
 
-            dieIfProxyEnabled();
-            dieIfStreamIsolationEnabled();
+        String latestAlgo = env.getProperty("namelookup.latest.algo", "restmerkleapi");
 
-            String latestAlgo = env.getProperty("namelookup.latest.algo", "restmerkleapi");
+        // TODO: make File(".") and filePrefix configurable
+        File directory = new File(".");
+        String filePrefix = "LibdohjNameLookupDaemon";
 
-            // TODO: make File(".") and filePrefix configurable
-            File directory = new File(".");
-            String filePrefix = "LibdohjNameLookupDaemon";
+        WalletAppKit kit = new WalletAppKit(context, directory, filePrefix) {
+            @Override
+            protected BlockStore provideBlockStore(File file) throws BlockStoreException {
+                return new LevelDBBlockStore(context, file);
+            }
 
-            kit = new WalletAppKit(context, directory, filePrefix) {
-                @Override
-                protected BlockStore provideBlockStore(File file) throws BlockStoreException {
-                    return new LevelDBBlockStore(context, file);
-                }
+            @Override
+            protected void onSetupCompleted() {
+                vPeerGroup.setMinRequiredProtocolVersion(params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.MINIMUM));
 
-                @Override
-                protected void onSetupCompleted() {
-                    vPeerGroup.setMinRequiredProtocolVersion(params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.MINIMUM));
-
-                    // Some of the algos require being setup inside this hook, so we do it here instead of after getKit() finishes.
-                    switch (latestAlgo) {
-                        case "leveldbtxcache":
-                            try {
-                                namePeerGroup = new PeerGroup(context.getParams(), kit.chain());
-
-                                // TODO: look into allowing non-bloom, non-headers peers since we don't use filtered blocks at the moment
-                                namePeerGroup.setMinRequiredProtocolVersion(context.getParams().getProtocolVersionNum(NetworkParameters.ProtocolVersion.BLOOM_FILTER));
-                                namePeerGroup.addPeerDiscovery(new DnsDiscovery(context.getParams()));
-                                namePeerGroup.startAsync();
-
-                                lookupLatest = new NameLookupLatestLevelDBTransactionCache(context, new File(directory, filePrefix + ".namedb"), kit.chain(), kit.store(), namePeerGroup);
-
-                                // TODO: optionally enable bloom filtering
-                                peerGroup().setBloomFilteringEnabled(false);
-                                peerGroup().setFastCatchupTimeSecs( (new Date().getTime() / 1000 ) - (366 * 24 * 60 * 60) );
-                            }
-                            catch (Exception e) {
-                                log.error("Exception creating Name Database", e);
-                                System.exit(-1);
-                            }
-                            break;
-                    }
-                }
-
-                @Override
-                protected void shutDown() throws Exception {
-                    if (namePeerGroup != null) {
-                        namePeerGroup.stop();
-                    }
-
-                    if (lookupLatest instanceof NameLookupLatestLevelDBTransactionCache) {
-                        log.info("Closing Name Database");
+                // Some of the algos require being setup inside this hook, so we do it here instead of after getKit() finishes.
+                switch (latestAlgo) {
+                    case "leveldbtxcache":
                         try {
-                            ((NameLookupLatestLevelDBTransactionCache)lookupLatest).close();
+                            namePeerGroup = new PeerGroup(context.getParams(), this.chain());
+
+                            // TODO: look into allowing non-bloom, non-headers peers since we don't use filtered blocks at the moment
+                            namePeerGroup.setMinRequiredProtocolVersion(context.getParams().getProtocolVersionNum(NetworkParameters.ProtocolVersion.BLOOM_FILTER));
+                            namePeerGroup.addPeerDiscovery(new DnsDiscovery(context.getParams()));
+                            namePeerGroup.startAsync();
+
+                            lookupLatest = new NameLookupLatestLevelDBTransactionCache(context, new File(directory, filePrefix + ".namedb"), this.chain(), this.store(), namePeerGroup);
+
+                            // TODO: optionally enable bloom filtering
+                            peerGroup().setBloomFilteringEnabled(false);
+                            peerGroup().setFastCatchupTimeSecs( (new Date().getTime() / 1000 ) - (366 * 24 * 60 * 60) );
                         }
                         catch (Exception e) {
-                            log.error("Exception occurred closing Name Database", e);
+                            log.error("Exception creating Name Database", e);
+                            System.exit(-1);
                         }
-                    }
-
-                    super.shutDown();
+                        break;
                 }
-            };
+            }
 
-            // TODO: call kit.setCheckpoints so that we sync faster.
-            // See the following links:
-            // https://groups.google.com/forum/?_escaped_fragment_=topic/bitcoinj/CycE9YTS7Bs#!topic/bitcoinj/CycE9YTS7Bs
-            // https://github.com/bitcoinj/bitcoinj/blob/master/tools/src/main/resources/org/bitcoinj/tools/build-checkpoints-help.txt
-            // https://github.com/namecoin/namecoin-core/blob/master/src/chainparams.cpp#L164
+            @Override
+            protected void shutDown() throws Exception {
+                if (namePeerGroup != null) {
+                    namePeerGroup.stop();
+                }
 
-            // When uncommented, this allows the RPC server to use an incomplete blockchain.  This is usually insecure for name lookups.
-            // TODO: uncomment this and use a different method to detect incomplete blockchains that doesn't block the RPC server from replying with error messages.
-            //kit.setBlockingStartup(false);
+                if (lookupLatest instanceof NameLookupLatestLevelDBTransactionCache) {
+                    log.info("Closing Name Database");
+                    try {
+                        ((NameLookupLatestLevelDBTransactionCache)lookupLatest).close();
+                    }
+                    catch (Exception e) {
+                        log.error("Exception occurred closing Name Database", e);
+                    }
+                }
 
-            // Start downloading the block chain and wait until it's done.
-            kit.startAsync();
-            kit.awaitRunning();
-        }
+                super.shutDown();
+            }
+        };
+
+        // TODO: call kit.setCheckpoints so that we sync faster.
+        // See the following links:
+        // https://groups.google.com/forum/?_escaped_fragment_=topic/bitcoinj/CycE9YTS7Bs#!topic/bitcoinj/CycE9YTS7Bs
+        // https://github.com/bitcoinj/bitcoinj/blob/master/tools/src/main/resources/org/bitcoinj/tools/build-checkpoints-help.txt
+        // https://github.com/namecoin/namecoin-core/blob/master/src/chainparams.cpp#L164
+
+        // When uncommented, this allows the RPC server to use an incomplete blockchain.  This is usually insecure for name lookups.
+        // TODO: uncomment this and use a different method to detect incomplete blockchains that doesn't block the RPC server from replying with error messages.
+        //kit.setBlockingStartup(false);
+
+        // Start downloading the block chain and wait until it's done.
+        kit.startAsync();
+        kit.awaitRunning();
 
         return kit;
     }
@@ -333,15 +318,6 @@ public class NamecoinConfig /* implements DisposableBean */ {
     }
 
     @Bean
-    public WalletAppKit getKit(Context context) throws Exception {
-        // TODO: make File(".") and filePrefix configurable
-        File directory = new File(".");
-        String filePrefix = "NamecoinJDaemon";
-
-        return new WalletAppKit(context, directory, filePrefix);
-     }
-
-    @Bean
     public Module bitcoinJMapper() {
         return new RpcServerModule();
     }
@@ -349,11 +325,6 @@ public class NamecoinConfig /* implements DisposableBean */ {
     @Bean
     public NameLookupService nameLookupService(NetworkParameters params, Context context, WalletAppKit kit, NameLookupByBlockHeight lookupByHeight, NameLookupLatest lookupLatest /*, PeerDiscovery peerDiscovery*/) {
         return new NameLookupService(params, context, kit, lookupByHeight, lookupLatest);
-    }
-
-    @Bean
-    public WalletAppKitService walletAppKitService(NetworkParameters params, Context context, WalletAppKit kit) {
-        return new WalletAppKitService(params, context, kit);
     }
 
     @Bean(name="/")
